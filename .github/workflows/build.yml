@@ -1,0 +1,42 @@
+name: Build iPhone IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build.yml'
+      - '*.swift'
+      - 'index.html'
+      - 'project.yml'
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Prepare project files
+        run: |
+          mkdir -p PNLCard/Resources
+          cp ContentView.swift PNLCard/ContentView.swift
+          cp PNLCardApp.swift PNLCard/PNLCardApp.swift
+          cp index.html PNLCard/Resources/index.html
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+      - name: Build unsigned iOS app
+        run: |
+          xcodebuild -project PNLCard.xcodeproj -scheme PNLCard -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/PNLCard.app Payload/
+          zip -qr PNLCard-unsigned.ipa Payload
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PNLCard-unsigned-IPA
+          path: PNLCard-unsigned.ipa
+          retention-days: 14
